@@ -5,18 +5,21 @@ from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/predict", tags=["Movie Recommendation System"])
 
+MODEL_PATH_DF = os.path.join(os.path.dirname(__file__), "..", "models", "movie_df.pkl")
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "models", "movie_model.pkl")
 model = None
 
 try:
-    if os.path.exists(MODEL_PATH):
-        with open(MODEL_PATH, "rb") as f:
+    path_to_load = MODEL_PATH if os.path.exists(MODEL_PATH) else (MODEL_PATH_DF if os.path.exists(MODEL_PATH_DF) else None)
+    if path_to_load:
+        with open(path_to_load, "rb") as f:
             model = pickle.load(f)
         print("✅ [Movie Recommendations] Model loaded successfully!")
     else:
-        print(f"⚠️ [Movie Recommendations] Model not found at {MODEL_PATH}")
+        print("⚠️ [Movie Recommendations] Model file not found.")
 except Exception as e:
     print(f"⚠️ [Movie Recommendations] Model loading error: {e}")
+
 
 class MovieInput(BaseModel):
     movie_title: str = Field(..., description="Name of the movie to query recommendations for")
