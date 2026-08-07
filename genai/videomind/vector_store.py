@@ -4,7 +4,19 @@ from dotenv import load_dotenv
 try:
     from langchain_text_splitters import RecursiveCharacterTextSplitter
 except ImportError:
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    try:
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
+    except ImportError:
+        class RecursiveCharacterTextSplitter:
+            def __init__(self, chunk_size=500, chunk_overlap=50):
+                self.chunk_size = chunk_size
+                self.chunk_overlap = chunk_overlap
+            def split_text(self, text):
+                chunks = []
+                step = max(1, self.chunk_size - self.chunk_overlap)
+                for i in range(0, len(text), step):
+                    chunks.append(text[i:i + self.chunk_size])
+                return chunks or [text]
 
 from langchain_core.documents import Document
 from langchain_groq import ChatGroq
