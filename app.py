@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Import all project routers
+# Import all ML/DL project routers
 from routers.fraud import router as fraud_router
 from routers.house import router as house_router
 from routers.airbnb import router as airbnb_router
@@ -13,10 +13,14 @@ from routers.movie import router as movie_router
 from routers.dogcat import router as dogcat_router
 from routers.mnist import router as mnist_router
 
+# Import Gen-AI project routers
+from routers.research import router as research_router
+from routers.videomind import router as videomind_router
+
 app = FastAPI(
-    title="AI & Machine Learning Microservice Gateway API",
-    description="Unified Production API hosting 9 Machine & Deep Learning models for Render Cloud Deployment.",
-    version="1.0.0"
+    title="AI, Machine Learning & Generative AI Microservice Gateway API",
+    description="Unified Production API hosting 11 Machine Learning, Deep Learning & Generative AI microservices for Cloud Deployment.",
+    version="2.0.0"
 )
 
 # Enable CORS for all frontends (Vercel, GitHub Pages, Render, localhost)
@@ -28,7 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include all endpoint routers
+# Include all ML & Deep Learning routers
 app.include_router(fraud_router)
 app.include_router(house_router)
 app.include_router(airbnb_router)
@@ -39,12 +43,16 @@ app.include_router(movie_router)
 app.include_router(dogcat_router)
 app.include_router(mnist_router)
 
+# Include all Generative AI routers
+app.include_router(research_router)
+app.include_router(videomind_router)
+
 @app.get("/")
 def root():
     return {
         "status": "online",
-        "service": "Unified AI/ML Portfolio Microservice Gateway",
-        "active_models": 9,
+        "service": "Unified AI, ML & Gen-AI Portfolio Microservice Gateway",
+        "active_models_and_services": 11,
         "docs_url": "/docs",
         "endpoints": [
             "POST /predict/fraud",
@@ -55,7 +63,12 @@ def root():
             "POST /predict/customer-segmentation",
             "POST /predict/movie",
             "POST /predict/dog-cat",
-            "POST /predict/mnist"
+            "POST /predict/mnist",
+            "POST /api/research",
+            "GET /api/research/stream",
+            "POST /api/process-url",
+            "POST /api/process-file",
+            "POST /api/chat"
         ]
     }
 
