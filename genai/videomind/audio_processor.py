@@ -18,7 +18,7 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 def process_input(source):
     """
     Process YouTube URL or local audio/video file.
-    Converts audio to Mono 16kHz WAV and splits into 10-minute chunks for Whisper.
+    Converts audio to Mono 16kHz WAV and enforces a 10-minute public portfolio limit.
     """
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
     if isinstance(source, str) and (source.startswith("http://") or source.startswith("https://") or "youtube.com" in source or "youtu.be" in source):
@@ -56,6 +56,18 @@ def process_input(source):
 
     # Convert to Mono and 16kHz (Whisper Sweet Spot)
     audio = AudioSegment.from_file(file_path)
+
+    # -----------------------------------------------------------
+    # Portfolio Guardrail: Cap public audio processing at 10 mins
+    # -----------------------------------------------------------
+    max_allowed_ms = 10 * 60 * 1000  # 10 minutes in ms
+    if len(audio) > max_allowed_ms:
+        duration_mins = round(len(audio) / 60000.0, 1)
+        raise ValueError(
+            f"Audio duration ({duration_mins} mins) exceeds the 10-minute public limit. "
+            "Please use a video or audio clip under 10 minutes."
+        )
+
     audio = audio.set_channels(1).set_frame_rate(16000)
     
     base_name = os.path.splitext(os.path.basename(file_path))[0]

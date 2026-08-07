@@ -1,6 +1,12 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+# Global Rate Limiter by Client IP
+limiter = Limiter(key_func=get_remote_address)
 
 # Import all ML/DL project routers
 from routers.fraud import router as fraud_router
@@ -22,6 +28,10 @@ app = FastAPI(
     description="Unified Production API hosting 11 Machine Learning, Deep Learning & Generative AI microservices for Cloud Deployment.",
     version="2.0.0"
 )
+
+# Attach rate limiter to FastAPI state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Enable CORS for all frontends (Vercel, GitHub Pages, Render, localhost)
 app.add_middleware(
@@ -53,6 +63,7 @@ def root():
         "status": "online",
         "service": "Unified AI, ML & Gen-AI Portfolio Microservice Gateway",
         "active_models_and_services": 11,
+        "rate_limiting": "Enabled (3-5 req/hr per IP for Gen-AI endpoints)",
         "docs_url": "/docs",
         "endpoints": [
             "POST /predict/fraud",

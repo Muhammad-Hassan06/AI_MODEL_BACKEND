@@ -1,10 +1,13 @@
 import os
 import asyncio
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from genai.research.pipeline import run_research_pipeline, run_research_pipeline_stream
 
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="", tags=["Autonomous AI Research Agent"])
 
 class ResearchRequest(BaseModel):
@@ -18,15 +21,20 @@ def research_health_check():
         "status": "healthy",
         "service": "Autonomous AI Research Agent",
         "llm_provider": "Groq (llama-3.3-70b-versatile)",
+        "rate_limit": "3 requests per hour per IP",
         "groq_key_configured": bool(groq_key),
         "tavily_key_configured": bool(tavily_key)
     }
 
 @router.post("/api/research")
-def research_endpoint(req: ResearchRequest):
-    """Run multi-agent research pipeline synchronously."""
+@limiter.limit("3/hour")
+def research_endpoint(request: Request, req: ResearchRequest):
+    """Run multi-agent research pipeline synchronously (Max 3/hour per IP address)."""
     if not req.topic or not req.topic.strip():
         raise HTTPException(status_code=400, detail="Topic cannot be empty.")
+    if len(req.topic.strip()) > 200:
+        raise HTTPException(status_code=400, detail="Topic length exceeds maximum limit of 200 characters.")
+        
     try:
         results = run_research_pipeline(req.topic.strip())
         return {"success": True, "topic": req.topic, "results": results}
@@ -34,10 +42,13 @@ def research_endpoint(req: ResearchRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/api/research/stream")
-async def research_stream_endpoint(topic: str):
-    """Stream multi-agent pipeline progress step-by-step using Server-Sent Events (SSE)."""
+@limiter.limit("3/hour")
+async def research_stream_endpoint(request: Request, topic: str):
+    """Stream multi-agent pipeline progress step-by-step using SSE (Max 3/hour per IP address)."""
     if not topic or not topic.strip():
         raise HTTPException(status_code=400, detail="Topic parameter is required.")
+    if len(topic.strip()) > 200:
+        raise HTTPException(status_code=400, detail="Topic length exceeds maximum limit of 200 characters.")
     
     async def event_generator():
         try:
