@@ -1,5 +1,6 @@
 import os
 import pickle
+import joblib
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -10,8 +11,11 @@ model = None
 
 try:
     if os.path.exists(MODEL_PATH):
-        with open(MODEL_PATH, "rb") as f:
-            model = pickle.load(f)
+        try:
+            model = joblib.load(MODEL_PATH)
+        except Exception:
+            with open(MODEL_PATH, "rb") as f:
+                model = pickle.load(f)
         print("✅ [Mental Health] Model loaded successfully!")
     else:
         print(f"⚠️ [Mental Health] Model not found at {MODEL_PATH}")

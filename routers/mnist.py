@@ -1,6 +1,7 @@
 import os
 import io
 import pickle
+import joblib
 import requests
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
@@ -14,8 +15,11 @@ model = None
 
 try:
     if os.path.exists(MODEL_PATH):
-        with open(MODEL_PATH, "rb") as f:
-            model = pickle.load(f)
+        try:
+            model = joblib.load(MODEL_PATH)
+        except Exception:
+            with open(MODEL_PATH, "rb") as f:
+                model = pickle.load(f)
         print("✅ [MNIST] Model loaded successfully!")
     else:
         print(f"⚠️ [MNIST] Model not found at {MODEL_PATH}")

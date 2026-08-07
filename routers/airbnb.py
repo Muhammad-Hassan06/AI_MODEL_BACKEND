@@ -1,5 +1,6 @@
 import os
 import pickle
+import joblib
 import numpy as np
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -11,13 +12,16 @@ model = None
 
 try:
     if os.path.exists(MODEL_PATH):
-        with open(MODEL_PATH, "rb") as f:
-            model = pickle.load(f)
+        try:
+            model = joblib.load(MODEL_PATH)
+        except Exception:
+            with open(MODEL_PATH, "rb") as f:
+                model = pickle.load(f)
         print("✅ [Airbnb] Model loaded successfully!")
     else:
         print(f"⚠️ [Airbnb] Model not found at {MODEL_PATH}")
 except Exception as e:
-    print(f"⚠️ [Airbnb] Model loading error: {e}")
+        print(f"⚠️ [Airbnb] Model loading error: {e}")
 
 class AirbnbInput(BaseModel):
     price: float = Field(..., ge=0)
