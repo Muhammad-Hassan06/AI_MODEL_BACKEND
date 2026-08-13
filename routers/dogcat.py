@@ -3,6 +3,7 @@ import io
 import pickle
 import joblib
 import requests
+import base64
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 from PIL import Image
@@ -129,9 +130,16 @@ async def predict_dogcat_file(file: UploadFile = File(...)):
 @router.post("/dog-cat-url")
 def predict_dogcat_url(payload: UrlInput):
     try:
-        resp = requests.get(payload.url, timeout=8)
-        resp.raise_for_status()
-        img = Image.open(io.BytesIO(resp.content))
-        return perform_dogcat_inference(img, hint_text=payload.url or "")
+        url_str = str(payload.url or "").strip()
+        if url_str.startswith("data:image/") or ";base64," in url_str:
+            _, encoded = url_str.split(",", 1) if "," in url_str else ("", url_str)
+            img_data = base64.b64decode(encoded)
+            img = Image.open(io.BytesIO(img_data))
+            return perform_dogcat_inference(img, hint_text="data_image")
+        else:
+            resp = requests.get(url_str, timeout=8)
+            resp.raise_for_status()
+            img = Image.open(io.BytesIO(resp.content))
+            return perform_dogcat_inference(img, hint_text=url_str)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch image from URL: {str(e)}")
