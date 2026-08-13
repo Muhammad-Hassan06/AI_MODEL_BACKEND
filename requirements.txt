@@ -19,7 +19,6 @@ tavily-python>=0.3.0
 beautifulsoup4>=4.12.0
 yt-dlp>=2024.0.0
 pydub>=0.25.0
-audioop-lts
 imageio-ffmpeg>=0.4.9
 groq>=0.4.0
 slowapi>=0.1.9
