@@ -16,11 +16,11 @@ sess = None
 try:
     if os.path.exists(MODEL_PATH):
         sess = ort.InferenceSession(MODEL_PATH)
-        print("✅ [DogCat] ONNX Model loaded successfully!")
+        print("[OK] [DogCat] ONNX Model loaded successfully!")
     else:
-        print(f"⚠️ [DogCat] ONNX Model not found at {MODEL_PATH}")
+        print(f"[WARNING] [DogCat] ONNX Model not found at {MODEL_PATH}")
 except Exception as e:
-    print(f"⚠️ [DogCat] ONNX Model loading error: {e}")
+    print(f"[WARNING] [DogCat] ONNX Model loading error: {e}")
 
 class UrlInput(BaseModel):
     url: str = Field(..., description="HTTP/HTTPS URL of the image to classify")
