@@ -79,7 +79,7 @@ def heuristic_mnist_analysis(arr_28x28: np.ndarray):
 
 @router.post("/mnist")
 async def predict_mnist_file(file: UploadFile = File(...)):
-    if not file.content_type.startswith("image/"):
+    if file.content_type and not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Uploaded file must be an image.")
     try:
         contents = await file.read()
