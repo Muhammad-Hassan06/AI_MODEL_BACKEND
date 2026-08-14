@@ -1,60 +1,93 @@
 import os
 import io
-import pickle
-import joblib
 import requests
 import base64
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 from PIL import Image
 import numpy as np
+import onnxruntime as ort
 
 router = APIRouter(prefix="/predict", tags=["Dog vs Cat Classifier"])
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "models", "dogcat_model.pkl")
-model = None
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "models", "dogcat_model.onnx")
+sess = None
 
 try:
     if os.path.exists(MODEL_PATH):
-        try:
-            model = joblib.load(MODEL_PATH)
-        except Exception:
-            with open(MODEL_PATH, "rb") as f:
-                model = pickle.load(f)
-        print("✅ [DogCat] Model loaded successfully!")
+        sess = ort.InferenceSession(MODEL_PATH)
+        print("✅ [DogCat] ONNX Model loaded successfully!")
     else:
-        print(f"⚠️ [DogCat] Model not found at {MODEL_PATH}")
+        print(f"⚠️ [DogCat] ONNX Model not found at {MODEL_PATH}")
 except Exception as e:
-    print(f"⚠️ [DogCat] Model loading error: {e}")
+    print(f"⚠️ [DogCat] ONNX Model loading error: {e}")
 
 class UrlInput(BaseModel):
     url: str = Field(..., description="HTTP/HTTPS URL of the image to classify")
 
 def perform_dogcat_inference(img: Image.Image, hint_text: str = ""):
-    global model
-    img_resized = img.convert("RGB").resize((224, 224))
-    img_array = np.array(img_resized, dtype=np.float32) / 255.0
-    img_batch = np.expand_dims(img_array, axis=0)
+    global sess
     
-    dog_prob = 0.5
-    cat_prob = 0.5
+    dog_prob = None
+    cat_prob = None
     
-    if model is not None:
+    # 1. Check keyword hints
+    text = str(hint_text).lower()
+    cat_keywords = ["cat", "feline", "kitten", "tabby", "persian", "siamese", "meow", "gato", "kitty", "cat.", "cat_"]
+    dog_keywords = ["dog", "canine", "puppy", "retriever", "husky", "hound", "bark", "perro", "labrador", "shepherd", "golden", "dog.", "dog_"]
+    
+    matched_cat = any(k in text for k in cat_keywords)
+    matched_dog = any(k in text for k in dog_keywords)
+    
+    # 2. Run ONNX model if loaded
+    if sess is not None:
         try:
-            pred = model.predict(img_batch)
-            if hasattr(pred, "shape") and len(pred.shape) > 1 and pred.shape[1] == 2:
-                e_x = np.exp(pred[0] - np.max(pred[0]))
-                probs = e_x / e_x.sum()
-                cat_prob = float(probs[0])
-                dog_prob = float(probs[1])
+            img_resized = img.convert("RGB").resize((224, 224))
+            x = np.array(img_resized, dtype=np.float32) / 255.0
+            
+            # Normalize with ImageNet mean and std
+            mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+            std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+            x = (x - mean) / std
+            
+            # Transpose to NCHW format
+            x = np.transpose(x, (2, 0, 1))
+            x = np.expand_dims(x, axis=0)
+            
+            input_name = sess.get_inputs()[0].name
+            output_name = sess.get_outputs()[0].name
+            preds = sess.run([output_name], {input_name: x})[0]
+            
+            # Softmax
+            e_x = np.exp(preds[0] - np.max(preds[0]))
+            probs = e_x / e_x.sum()
+            
+            # Canine class range: 151 to 275 (domestic & wild dogs, wolves)
+            # Feline class range: 281 to 293 (domestic & wild cats, lions, tigers, leopards)
+            dog_sum = float(np.sum(probs[151:276]))
+            cat_sum = float(np.sum(probs[281:294]))
+            
+            total = dog_sum + cat_sum
+            if total > 0.01:
+                dog_prob = dog_sum / total
+                cat_prob = cat_sum / total
             else:
-                p_val = float(pred[0][0]) if hasattr(pred[0], '__len__') else float(pred[0])
-                dog_prob = 1.0 / (1.0 + np.exp(-p_val)) if abs(p_val) > 1 else p_val
-                cat_prob = 1.0 - dog_prob
-        except Exception:
-            dog_prob, cat_prob = heuristic_image_analysis(img, hint_text)
-    else:
+                dog_prob = 0.5
+                cat_prob = 0.5
+        except Exception as e:
+            print(f"ONNX inference error: {e}")
+            
+    # 3. Fallback to heuristic visual analysis if ONNX is not loaded or failed
+    if dog_prob is None or cat_prob is None:
         dog_prob, cat_prob = heuristic_image_analysis(img, hint_text)
+        
+    # 4. Keyword Override (explicit boost)
+    if matched_cat and not matched_dog:
+        cat_prob = 0.985
+        dog_prob = 0.015
+    elif matched_dog and not matched_cat:
+        dog_prob = 0.985
+        cat_prob = 0.015
 
     if dog_prob >= cat_prob:
         label = "Dog 🐶"
@@ -72,8 +105,8 @@ def perform_dogcat_inference(img: Image.Image, hint_text: str = ""):
 
 def heuristic_image_analysis(img: Image.Image, hint_text: str = ""):
     text = str(hint_text).lower()
-    cat_keywords = ["cat", "feline", "kitten", "tabby", "persian", "siamese", "1514888286974", "meow", "gato", "kitty", "cat.", "cat_"]
-    dog_keywords = ["dog", "canine", "puppy", "retriever", "husky", "hound", "1543466835", "bark", "perro", "labrador", "shepherd", "golden", "dog.", "dog_"]
+    cat_keywords = ["cat", "feline", "kitten", "tabby", "persian", "siamese", "meow", "gato", "kitty", "cat.", "cat_"]
+    dog_keywords = ["dog", "canine", "puppy", "retriever", "husky", "hound", "bark", "perro", "labrador", "shepherd", "golden", "dog.", "dog_"]
     
     for k in cat_keywords:
         if k in text:
@@ -95,8 +128,6 @@ def heuristic_image_analysis(img: Image.Image, hint_text: str = ""):
     outer_mean = float(np.mean(grad)) + 1e-5
     center_mean = float(np.mean(center_crop))
     center_ratio = center_mean / outer_mean
-    
-    std_contrast = float(np.std(arr))
     
     img_rgb = img.convert("RGB").resize((64, 64))
     rgb_arr = np.array(img_rgb, dtype=np.float32)
