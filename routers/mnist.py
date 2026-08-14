@@ -20,11 +20,11 @@ try:
         except Exception:
             with open(MODEL_PATH, "rb") as f:
                 model = pickle.load(f)
-        print("✅ [MNIST] Model loaded successfully!")
+        print("[OK] [MNIST] Model loaded successfully!")
     else:
-        print(f"⚠️ [MNIST] Model not found at {MODEL_PATH}")
+        print(f"[WARNING] [MNIST] Model not found at {MODEL_PATH}")
 except Exception as e:
-    print(f"⚠️ [MNIST] Model loading error: {e}")
+    print(f"[WARNING] [MNIST] Model loading error: {e}")
 
 class UrlInput(BaseModel):
     url: str = Field(..., description="HTTP/HTTPS URL of the handwritten digit image")
